@@ -20,37 +20,100 @@ serve(async (req) => {
       );
     }
 
+    // Check for user's own Gemini API key first, then fall back to Lovable AI
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY not configured');
-      return new Response(
-        JSON.stringify({ error: 'AI service not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
+    
     console.log('Generating image for prompt:', prompt.substring(0, 50) + '...');
 
     // Enhanced prompt for 16:9 aspect ratio
     const enhancedPrompt = `Create a high-quality 16:9 aspect ratio image. ${prompt}. The image should be cinematic, professional, and visually striking with a 16:9 widescreen composition.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: enhancedPrompt
+    let response;
+    
+    // Try using user's Gemini API key first if available
+    if (GEMINI_API_KEY) {
+      console.log('Using user Gemini API key');
+      
+      // Use Google's Imagen 3 through Vertex AI API
+      // Note: This uses the generative AI endpoint
+      try {
+        response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': GEMINI_API_KEY,
+          },
+          body: JSON.stringify({
+            instances: [
+              {
+                prompt: enhancedPrompt
+              }
+            ],
+            parameters: {
+              sampleCount: 1,
+              aspectRatio: "16:9",
+              safetySetting: "block_some",
+              personGeneration: "allow_adult"
+            }
+          }),
+        });
+
+        if (!response.ok) {
+          console.log('Gemini API failed, falling back to Lovable AI');
+          response = null;
+        } else {
+          const data = await response.json();
+          console.log('Successfully generated image with user Gemini API');
+          
+          // Imagen returns base64 encoded images in predictions array
+          const imageData = data.predictions?.[0]?.bytesBase64Encoded;
+          
+          if (!imageData) {
+            console.log('No image data from Gemini, falling back to Lovable AI');
+            response = null;
+          } else {
+            return new Response(
+              JSON.stringify({ image: `data:image/png;base64,${imageData}` }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
           }
-        ],
-        modalities: ['image', 'text']
-      }),
-    });
+        }
+      } catch (error) {
+        console.error('Error with Gemini API:', error);
+        response = null;
+      }
+    }
+    
+    // Fall back to Lovable AI Gateway if user key not available or failed
+    if (!response) {
+      if (!LOVABLE_API_KEY) {
+        console.error('No API keys configured');
+        return new Response(
+          JSON.stringify({ error: 'AI service not configured' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('Using Lovable AI Gateway');
+      response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash-image-preview',
+          messages: [
+            {
+              role: 'user',
+              content: enhancedPrompt
+            }
+          ],
+          modalities: ['image', 'text']
+        }),
+      });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
