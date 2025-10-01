@@ -35,39 +35,34 @@ serve(async (req) => {
     if (GEMINI_API_KEY) {
       console.log('Using user Gemini API key');
       
-      // Use Google's Imagen 3 through Vertex AI API
-      // Note: This uses the generative AI endpoint
+      // Use Gemini 2.5 Flash Image Preview (aka Nano Banana)
       try {
-        response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict', {
+        response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-goog-api-key': GEMINI_API_KEY,
           },
           body: JSON.stringify({
-            instances: [
-              {
-                prompt: enhancedPrompt
-              }
-            ],
-            parameters: {
-              sampleCount: 1,
-              aspectRatio: "16:9",
-              safetySetting: "block_some",
-              personGeneration: "allow_adult"
-            }
+            contents: [{
+              parts: [
+                { text: enhancedPrompt }
+              ]
+            }]
           }),
         });
 
         if (!response.ok) {
-          console.log('Gemini API failed, falling back to Lovable AI');
+          const errorText = await response.text();
+          console.log('Gemini API failed:', errorText);
+          console.log('Falling back to Lovable AI');
           response = null;
         } else {
           const data = await response.json();
           console.log('Successfully generated image with user Gemini API');
           
-          // Imagen returns base64 encoded images in predictions array
-          const imageData = data.predictions?.[0]?.bytesBase64Encoded;
+          // Extract base64 image data from response
+          const imageData = data.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData)?.inlineData?.data;
           
           if (!imageData) {
             console.log('No image data from Gemini, falling back to Lovable AI');
