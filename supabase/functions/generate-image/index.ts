@@ -74,7 +74,10 @@ serve(async (req) => {
             response = null;
           } else {
             return new Response(
-              JSON.stringify({ image: `data:image/png;base64,${imageData}` }),
+              JSON.stringify({ 
+                image: `data:image/png;base64,${imageData}`,
+                source: 'user_gemini_api'
+              }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
@@ -145,7 +148,10 @@ serve(async (req) => {
     console.log('Successfully generated image');
 
     return new Response(
-      JSON.stringify({ image: imageUrl }),
+      JSON.stringify({ 
+        image: imageUrl,
+        source: 'lovable_ai'
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

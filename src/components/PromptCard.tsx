@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +17,7 @@ const PromptCard = ({ prompt, index }: PromptCardProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [apiSource, setApiSource] = useState<string | null>(null);
 
   const handleCopy = async () => {
     try {
@@ -39,8 +41,13 @@ const PromptCard = ({ prompt, index }: PromptCardProps) => {
 
       if (data?.image) {
         setGeneratedImage(data.image);
+        setApiSource(data.source);
         setShowModal(true);
-        toast.success("Image generated successfully!");
+        
+        const sourceText = data.source === 'user_gemini_api' 
+          ? "သင့်ရဲ့ Gemini API Key" 
+          : "Lovable AI";
+        toast.success(`ပုံထုတ်ပြီးပါပြီ! (${sourceText} သုံးထားပါတယ်)`);
       }
     } catch (error) {
       console.error("Error generating image:", error);
@@ -68,13 +75,22 @@ const PromptCard = ({ prompt, index }: PromptCardProps) => {
             {prompt}
           </p>
         </CardContent>
-        <CardFooter className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopy}
-            className="flex-1"
-          >
+        <CardFooter className="flex flex-col gap-2">
+          {apiSource && (
+            <Badge 
+              variant={apiSource === 'user_gemini_api' ? 'default' : 'secondary'}
+              className="self-start"
+            >
+              {apiSource === 'user_gemini_api' ? '🔑 သင့်ရဲ့ Gemini API' : '⚡ Lovable AI'}
+            </Badge>
+          )}
+          <div className="flex gap-2 w-full">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopy}
+              className="flex-1"
+            >
             {copied ? (
               <>
                 <Check className="mr-2 h-3 w-3" />
@@ -105,6 +121,7 @@ const PromptCard = ({ prompt, index }: PromptCardProps) => {
               </>
             )}
           </Button>
+          </div>
         </CardFooter>
       </Card>
 
